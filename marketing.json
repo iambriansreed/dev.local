@@ -1,0 +1,8 @@
+{
+    "name": "marketing.dev.localhost",
+    "port": 4180,
+    "path": ".",
+    "title": "marketing.dev.localhost",
+    "custom": true,
+    "command": "npm run dev:marketing"
+}

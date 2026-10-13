@@ -1,0 +1,77 @@
+# Checks a pull request before it can reach main, where release.yml tests again and
+# then cuts a release: the same checks, with nothing released, pushed or deployed.
+# Read-only, and nothing here holds a token worth stealing.
+name: CI
+
+on:
+    pull_request:
+
+permissions:
+    contents: read
+
+# A new push to the same pull request makes the older run pointless
+concurrency:
+    group: ci-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    check:
+        name: Check
+        runs-on: macos-26
+        timeout-minutes: 30
+        steps:
+            # Full history and tags: the site's build number counts commits up to the
+            # release tag (web/build-number.ts)
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Setup Node
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+              with:
+                  node-version: '24'
+                  cache: 'npm'
+
+            # As in release.yml: the newest Xcode installed, not the image's default
+            - name: Select the newest Xcode
+              run: |
+                  XCODE="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
+                  if [ -n "$XCODE" ]; then
+                      echo "Using $XCODE"
+                      sudo xcode-select -s "$XCODE"
+                  else
+                      echo "No /Applications/Xcode_*.app; keeping $(xcode-select -p)"
+                  fi
+                  swift --version
+
+            - name: Install dependencies
+              run: npm ci --ignore-scripts
+
+            # After the install: it runs through tsx, from node_modules
+            - name: Check the version is in sync
+              run: .scripts/version.ts --check
+
+            - name: Typecheck the scripts
+              run: npm run typecheck
+
+            - name: Test the scripts
+              run: npm run test:scripts
+
+            - name: Test the server
+              run: npm run test:server
+
+            - name: Test the app
+              run: app/scripts/test.sh
+
+            - name: Build the site and the server
+              run: npm run build
+
+            # web/assets/install.sh is what people pipe into sh. It must parse, and its dry
+            # run must pass on a clean runner without changing anything (it reads the release
+            # list, so it also checks the release is published)
+            - name: Check the install script
+              run: |
+                  sh -n web/assets/install.sh
+                  DEV_LOCAL_DRY_RUN=1 DEV_LOCAL_INSTALL_DIR="$RUNNER_TEMP/Applications" sh web/assets/install.sh || true

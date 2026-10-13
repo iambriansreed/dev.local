@@ -1,0 +1,74 @@
+name: Deploy Web
+
+# Builds the site with Skrapa and publishes web/dist to GitHub Pages. The custom domain
+# (devlocal.iambrian.com) and the "GitHub Actions" source are set in the repository's
+# Pages settings, not by a committed CNAME file.
+#
+# Not triggered by pushes itself: release.yml calls it as its last job, with the
+# release tag when it cut one. The site shows the app's version, and a push-triggered
+# deploy would build the commit from *before* the version bump, then race the
+# pipeline's own deploy. Run it by hand to redeploy main as it stands.
+on:
+    workflow_call:
+        inputs:
+            ref:
+                description: 'Tag or commit to build the site from'
+                required: true
+                type: string
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+concurrency:
+    group: 'deploy-web'
+    cancel-in-progress: true
+
+jobs:
+    deploy:
+        name: Deploy
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ inputs.ref || github.ref }}
+                  # Full history and tags, so the release tag is there to build from
+                  fetch-depth: 0
+                  # It never pushes, so no token is left in .git/config
+                  persist-credentials: false
+
+            - name: Setup Node
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+              with:
+                  node-version: '24'
+                  cache: 'npm'
+
+            # No package needs an install script; skipping them means none can run
+            # in a job that can deploy the site
+            - name: Install dependencies
+              run: npm ci --ignore-scripts
+
+            # The site shows web/version.json's version, a copy of the app's version in
+            # app/Resources/Info.plist. Don't publish a number the app doesn't have.
+            # After the install: it runs through tsx, from node_modules.
+            - name: Check the version is in sync
+              run: .scripts/version.ts --check
+
+            - name: Build site
+              run: npm run build
+
+            - name: Upload artifact
+              uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+              with:
+                  path: web/dist
+
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -1,0 +1,53 @@
+[
+  {
+    "name": "storefront",
+    "port": 3000,
+    "path": "/Users/demo/Projects/storefront",
+    "title": "Storefront"
+  },
+  {
+    "name": "app.northwind.test",
+    "port": 3100,
+    "path": "/Users/demo/Projects/northwind",
+    "title": "Northwind",
+    "custom": true
+  },
+  {
+    "name": "api.northwind.test",
+    "port": 3101,
+    "path": "/Users/demo/Projects/northwind",
+    "title": "Northwind API",
+    "custom": true,
+    "command": "npm run dev:api"
+  },
+  {
+    "name": "admin",
+    "port": 4200,
+    "path": "/Users/demo/Projects/admin",
+    "title": "Admin Console",
+    "command": "npx ng serve"
+  },
+  {
+    "name": "docs",
+    "port": 5173,
+    "path": "/Users/demo/Projects/docs",
+    "title": "Docs"
+  },
+  {
+    "name": "storybook.ui",
+    "port": 6006,
+    "path": "/Users/demo/Projects/ui-kit",
+    "title": "UI Kit",
+    "command": "npm run storybook"
+  },
+  {
+    "name": "playground",
+    "port": 8081,
+    "path": "/Users/demo/Projects/playground"
+  },
+  {
+    "name": "blog",
+    "port": 4000,
+    "title": "Old Blog"
+  }
+]

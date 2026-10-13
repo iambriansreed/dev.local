@@ -1,0 +1,27 @@
+{
+    // These scripts are TypeScript run as is, so nothing is compiled before they run. This
+    // config is only for checking them: `npm run typecheck` (and any editor) reads it, and it
+    // emits nothing.
+    //
+    // Imports name the module, not the file (`./marketing-site`). Node cannot resolve that on
+    // its own, so a script that imports a sibling runs through tsx, as the npm scripts and the
+    // `npx tsx` shebangs do; `bundler` resolution is what lets tsc check that style. The ones
+    // that run before `npm install` (the commit-msg hook, and plist-version, which
+    // commit-and-tag-version require()s) import nothing local, so plain Node runs them.
+    //
+    // erasableSyntaxOnly keeps out the TypeScript Node cannot strip (enums, namespaces,
+    // parameter properties) for those two; verbatimModuleSyntax makes a type-only import say so.
+    "compilerOptions": {
+        "noEmit": true,
+        "strict": true,
+        "target": "ES2024",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "erasableSyntaxOnly": true,
+        "verbatimModuleSyntax": true,
+        "types": ["node"],
+        "lib": ["ES2024"],
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": ["**/*.ts"]
+}

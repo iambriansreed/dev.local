@@ -1,0 +1,200 @@
+# The whole pipeline for a commit that lands on main, modelled on menu-otp's: test, cut
+# a release if the commits call for one, build and publish its .dmg, then deploy the
+# website, in that order and each only if the one before it passed.
+#
+# A release is cut by .scripts/release.ts (commit-and-tag-version): the Conventional
+# Commits since the last tag choose the bump, CHANGELOG.md gets its section, and
+# "chore(release): x.y.z" is committed and tagged v<x.y.z>. It happens only when one of
+# those commits is a feat, fix, perf or breaking change, so a docs or website push
+# tests, skips straight to the deploy, and ships no new .dmg.
+#
+# The release commit is a push to main made by this workflow, which has to not start
+# it again. GitHub doesn't start runs from pushes made with GITHUB_TOKEN; and if that
+# ever changes (a PAT, a deploy key), the rerun finds HEAD already tagged and its
+# GitHub release already published, and does nothing but redeploy the site.
+name: Release
+
+on:
+    push:
+        branches: ['main']
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: 'Existing tag to build and publish (e.g. v0.2.0). Leave empty to release from main.'
+                required: false
+                type: string
+
+permissions:
+    contents: write
+
+# One at a time, never cancelled. Two runs cutting a version at once would make two
+# tags for one line of history, and the loser would push onto a main that has moved.
+concurrency:
+    group: 'release'
+    cancel-in-progress: false
+
+jobs:
+    release:
+        name: Test and release
+        runs-on: macos-26
+        # A hung build otherwise holds the release queue for the 6-hour default
+        timeout-minutes: 45
+        outputs:
+            ref: ${{ steps.release.outputs.ref }}
+        steps:
+            # "Run workflow" offers every branch, and without a tag this job cuts a
+            # release from whichever one was chosen and then pushes it to main with
+            # "HEAD:main" — fast-forwarding main onto an unmerged branch and shipping
+            # a .dmg built from it. Only main may be released from.
+            - name: Refuse to release from a branch other than main
+              if: ${{ !inputs.tag && github.ref != 'refs/heads/main' }}
+              # Through env, never ${{ }} inside the script: a branch name is chosen by
+              # whoever pushed it and can hold shell syntax
+              env:
+                  REF: ${{ github.ref }}
+              run: |
+                  echo "Releasing is only possible from main; this run is on $REF." >&2
+                  echo "Re-run it on main, or give the tag input to build an existing tag." >&2
+                  exit 1
+
+            # The branch, not the pushed SHA: a re-run after a half-finished release
+            # then sees the release commit that is already on main. Full history and
+            # tags: the changelog is written from the commits since the last tag, and
+            # app/scripts/bundle.sh stamps the commit count as the build number.
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ inputs.tag || github.ref }}
+                  fetch-depth: 0
+
+            - name: Setup Node
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+              with:
+                  node-version: '24'
+
+            # The app is developed against the newest Xcode, which is rarely the
+            # image's default. Building with the newest one installed keeps CI's Swift
+            # as close to the local toolchain as the runner allows.
+            - name: Select the newest Xcode
+              run: |
+                  XCODE="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
+                  if [ -n "$XCODE" ]; then
+                      echo "Using $XCODE"
+                      sudo xcode-select -s "$XCODE"
+                  else
+                      # An image that ships a single /Applications/Xcode.app, or none at
+                      # all: whatever is already selected has to do, and the build fails
+                      # later with a real message if it's too old.
+                      echo "No /Applications/Xcode_*.app; keeping $(xcode-select -p)"
+                  fi
+                  swift --version
+
+            # commit-and-tag-version, at the versions package-lock.json pins. This job
+            # can push to main, so nothing here resolves a dependency at run time, and
+            # no package's install script runs while the push token is on disk.
+            - name: Install release tooling
+              run: npm ci --ignore-scripts
+
+            # app/Resources/Info.plist and its generated copies must agree before
+            # anything is built on them; a hand edit that missed one stops here. After
+            # the install: it runs through tsx, from node_modules.
+            - name: Check the version is in sync
+              run: .scripts/version.ts --check
+
+            # Before the version is cut, not after: a failure found later would leave
+            # a release commit for something that doesn't work
+            - name: Test
+              run: |
+                  npm run typecheck
+                  npm run test:scripts
+                  npm run test:server
+                  app/scripts/test.sh
+
+            - name: Identify as the actions bot
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            # Commits and tags locally; nothing is pushed until the .dmg has built.
+            # The same script that cuts a release by hand, so there is one definition
+            # of what a release is. It does nothing when the commits don't call for a
+            # release, or when HEAD is already a release (cut and pushed from a laptop).
+            - name: Cut the release
+              if: ${{ !inputs.tag }}
+              run: .scripts/release.ts
+
+            # A release is a v* tag on HEAD, however it got there: cut just now, pushed
+            # from a laptop, or named by workflow_dispatch. It needs publishing when
+            # GitHub has no release for it yet, which also makes a re-run finish a
+            # release whose build or upload failed.
+            - name: Find the release at HEAD
+              id: release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  TAG="$(git tag --points-at HEAD | grep '^v' | head -1 || true)"
+                  if [ -z "$TAG" ]; then
+                      echo "No release at HEAD; the site deploys from this commit."
+                      echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+                      echo "publish=false" >> "$GITHUB_OUTPUT"
+                      exit 0
+                  fi
+                  # The .dmg is named and versioned from Info.plist, so a tag made by
+                  # hand on a commit with a different version can't be published
+                  if [ "v$(.scripts/version.ts)" != "$TAG" ]; then
+                      echo "HEAD is tagged $TAG but app/Resources/Info.plist says $(.scripts/version.ts)." >&2
+                      exit 1
+                  fi
+                  echo "ref=$TAG" >> "$GITHUB_OUTPUT"
+                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+                  echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+                  if gh release view "$TAG" >/dev/null 2>&1; then
+                      echo "$TAG is already published."
+                      echo "publish=false" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "$TAG needs publishing."
+                      echo "publish=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            # Universal, ad-hoc signed and not notarized: no certificates or secrets are involved.
+            # The bundle carries the server compiled for this commit (bundle.sh runs the build).
+            - name: Build the .dmg
+              if: steps.release.outputs.publish == 'true'
+              run: |
+                  app/scripts/bundle.sh release
+                  app/scripts/make-dmg.sh
+
+            # Only now that the build has passed. A no-op for a release that was
+            # already on main; fails (and publishes nothing) if main has moved, which
+            # the next run then picks up.
+            - name: Push the release commit and tag
+              if: ${{ steps.release.outputs.publish == 'true' && !inputs.tag }}
+              run: git push --follow-tags origin HEAD:main
+
+            # The notes are this version's CHANGELOG.md section.
+            - name: Publish the GitHub release
+              if: steps.release.outputs.publish == 'true'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ steps.release.outputs.tag }}
+                  VERSION: ${{ steps.release.outputs.version }}
+              run: |
+                  .scripts/release.ts --notes "$VERSION" > "$RUNNER_TEMP/notes.md"
+                  gh release create "$TAG" \
+                      --verify-tag \
+                      --title "dev.localhost $VERSION" \
+                      --notes-file "$RUNNER_TEMP/notes.md" \
+                      "app/build/dev.localhost-$VERSION.dmg"
+
+    deploy:
+        name: Deploy the website
+        # From the release tag when there is one, so the site shows the version that
+        # was just published, otherwise from the commit that was pushed
+        needs: release
+        permissions:
+            contents: read
+            pages: write
+            id-token: write
+        uses: ./.github/workflows/deploy-web.yml
+        with:
+            ref: ${{ needs.release.outputs.ref }}

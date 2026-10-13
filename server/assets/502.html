@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex" />
+        <title>502: nothing is listening</title>
+        <!-- Everything is inline. nginx serves this file off disk for whichever
+             host 502'd, and that vhost has no static root — a <link> or <img>
+             would only 502 in turn. Same reason the font stack is the system
+             one: the dashboard's DM Sans lives on another origin. -->
+        <style>
+            /* The dashboard's tokens, trimmed to the handful this page uses, so
+               the two look like the same tool without sharing a stylesheet. */
+            :root {
+                --bg: #0f0f11;
+                --surface: #17171c;
+                --surface-2: #1e1e25;
+                --border: #2a2a32;
+                --text: #e8e8f0;
+                --muted: #8a8a99;
+                --accent: #7c6af7;
+                --warn: #f0b74a;
+                --r-sm: 8px;
+                --r-md: 12px;
+                --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+            }
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            html {
+                font-size: 15px;
+                color-scheme: dark;
+            }
+
+            body {
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    'Segoe UI',
+                    Roboto,
+                    sans-serif;
+                background: radial-gradient(1200px 600px at 80% -10%, #1b1830 0%, transparent 60%), var(--bg);
+                color: var(--text);
+                line-height: 1.5;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 48px 20px;
+            }
+
+            main {
+                width: 100%;
+                max-width: 560px;
+            }
+
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 28px;
+            }
+            .brand svg {
+                width: 34px;
+                height: 34px;
+                filter: drop-shadow(0 8px 16px rgb(124 106 247 / 0.45));
+            }
+            .brand span {
+                font-size: 1.125rem;
+                font-weight: 600;
+                letter-spacing: -0.02em;
+            }
+
+            .card {
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: var(--r-md);
+                padding: 28px;
+            }
+
+            /* The status line reads as a label, not a headline — the sentence
+               under it is the thing worth reading. */
+            .status {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: var(--warn);
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                font-size: 0.8125rem;
+                margin-bottom: 12px;
+            }
+            /* Waiting is the accent colour, not the warning one: for the first
+               few seconds this is a dev server booting, which is normal. */
+            .waiting .status {
+                color: var(--accent);
+            }
+
+            .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 999px;
+                background: currentColor;
+                animation: pulse 1.6s ease-in-out infinite;
+            }
+            @keyframes pulse {
+                50% {
+                    opacity: 0.3;
+                }
+            }
+
+            /* A ring that turns, so waiting reads as progress rather than as a
+               slower version of the failure state's pulse. */
+            .spinner {
+                width: 12px;
+                height: 12px;
+                border-radius: 999px;
+                border: 2px solid currentColor;
+                border-right-color: transparent;
+                animation: spin 0.7s linear infinite;
+            }
+            @keyframes spin {
+                to {
+                    transform: rotate(1turn);
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .dot,
+                .spinner {
+                    animation: none;
+                }
+            }
+
+            /* The two halves of the page. Only one is ever on screen: waiting
+               while the app might still be coming up, failed once it plainly
+               isn't. The switch is a class on <body> — see the script. */
+            .waiting .when-failed,
+            .failed .when-waiting {
+                display: none;
+            }
+
+            h1 {
+                font-size: 1.375rem;
+                letter-spacing: -0.02em;
+                margin-bottom: 12px;
+            }
+
+            p {
+                color: var(--muted);
+            }
+            p + p {
+                margin-top: 12px;
+            }
+
+            code {
+                font-family: var(--mono);
+                font-size: 0.9375em;
+                background: var(--surface-2);
+                border: 1px solid var(--border);
+                border-radius: var(--r-sm);
+                padding: 2px 8px;
+                color: var(--text);
+                overflow-wrap: anywhere;
+            }
+
+            .actions {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
+                margin-top: 28px;
+            }
+
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                height: 38px;
+                padding: 0 16px;
+                border-radius: var(--r-sm);
+                border: 1px solid var(--border);
+                background: var(--surface-2);
+                color: var(--text);
+                font: inherit;
+                font-weight: 600;
+                text-decoration: none;
+                cursor: pointer;
+                transition: background 0.12s;
+            }
+            .btn:hover {
+                background: #2b2b35;
+            }
+            .btn-primary {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: #fff;
+            }
+            .btn-primary:hover {
+                background: #6b58ee;
+            }
+
+            .foot {
+                margin-top: 20px;
+                font-size: 0.8125rem;
+                color: var(--muted);
+            }
+            .foot a {
+                color: var(--accent);
+                text-decoration: none;
+            }
+            .foot a:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </head>
+    <!-- Starts here rather than being set by the script, so the waiting state is
+         what paints, with no flash of "bad gateway" before JS has run. With JS off
+         the page stays on this state and keeps its meaning: something isn't up
+         yet. -->
+    <body class="waiting">
+        <main>
+            <div class="brand">
+                <!-- The app icon, inlined: app/Resources/AppIcon.svg, the house with
+                     a prompt cut out of it on the indigo tile. -->
+                <svg viewBox="0 0 1024 1024" role="img" aria-label="dev.localhost">
+                    <defs>
+                        <linearGradient id="appTile" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" stop-color="#6366f1" />
+                            <stop offset="1" stop-color="#4338ca" />
+                        </linearGradient>
+                    </defs>
+                    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#appTile)" />
+                    <rect
+                        x="100"
+                        y="100"
+                        width="824"
+                        height="824"
+                        rx="185"
+                        fill="none"
+                        stroke="#fff"
+                        stroke-opacity="0.18"
+                        stroke-width="6"
+                    />
+                    <g transform="translate(281 281) scale(19.25)">
+                        <mask id="appCut">
+                            <rect width="24" height="24" fill="#fff" />
+                            <path
+                                d="M7.3 11.6l3 3-3 3M12.4 17.6h4.4"
+                                fill="none"
+                                stroke="#000"
+                                stroke-width="2.3"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </mask>
+                        <path
+                            d="M2.8 10.8 12 3l9.2 7.8V19.5a2 2 0 0 1-2 2H4.8a2 2 0 0 1-2-2z"
+                            fill="#fff"
+                            mask="url(#appCut)"
+                        />
+                    </g>
+                </svg>
+                <span>dev.localhost</span>
+            </div>
+
+            <div class="card">
+                <!-- A 502 usually means "not up *yet*" — a dev server takes a
+                     moment to bind its port, and arriving during that moment is
+                     the common case, not a failure. So this comes first, and the
+                     page only calls it a failure once waiting has plainly not
+                     worked. -->
+                <div class="when-waiting">
+                    <div class="status"><span class="spinner"></span>starting up</div>
+                    <h1>Waiting for <code class="host">this domain</code>…</h1>
+                    <p>
+                        nginx is running, but this app's dev server hasn't answered yet. The page
+                        reloads on its own as soon as it does.
+                    </p>
+                </div>
+
+                <div class="when-failed">
+                    <div class="status"><span class="dot"></span>502 · not running</div>
+                    <h1>The dev server for <code class="host">this domain</code> isn't running.</h1>
+                    <p>nginx is running, but nothing answers on the port this app points at.</p>
+                    <p>
+                        Start it from the dev.localhost menu with <strong>Start App</strong>, or run its dev
+                        command yourself. The page reloads on its own as soon as it answers.
+                    </p>
+
+                    <div class="actions">
+                        <button type="button" class="btn btn-primary" id="retry">Try again</button>
+                    </div>
+                </div>
+            </div>
+
+            <p class="foot">Served by dev.localhost.</p>
+        </main>
+
+        <script>
+            // nginx has no templating for error pages, so the host is filled in
+            // here rather than written into the file. Both states name it.
+            for (const el of document.querySelectorAll('.host')) el.textContent = location.host;
+
+            document.getElementById('retry').addEventListener('click', () => location.reload());
+
+            // How long to give the app before calling this a failure. Long
+            // enough for a dev server to bind its port, short enough that a
+            // domain with nothing behind it doesn't sit here spinning.
+            const GIVE_UP_AFTER = 10000;
+            // Keenly at first, because the interesting window is the first few
+            // seconds; slower afterwards, since by then it is a background tab
+            // waiting on someone to go and start something.
+            const POLL_WAITING = 700;
+            const POLL_FAILED = 3000;
+
+            setTimeout(() => document.body.className = 'failed', GIVE_UP_AFTER);
+
+            // Come back on our own once the app is up: poll the same origin and
+            // reload the moment it answers with anything that isn't a gateway
+            // error. Saves a hand on the refresh key while a dev server boots.
+            //
+            // Polling on a timeout chain rather than an interval, so a slow
+            // response can't stack requests up behind itself — and so the rate
+            // can change when the page gives up waiting.
+            (async function poll() {
+                try {
+                    const res = await fetch(location.href, { method: 'HEAD', cache: 'no-store' });
+                    if (res.status !== 502 && res.status !== 504) return location.reload();
+                } catch {
+                    /* still down — nginx is the one answering, so keep waiting */
+                }
+                setTimeout(poll, document.body.className === 'failed' ? POLL_FAILED : POLL_WAITING);
+            })();
+        </script>
+    </body>
+</html>

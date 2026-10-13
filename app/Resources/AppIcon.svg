@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="dev.localhost app icon">
+<title>dev.localhost app icon</title>
+<defs><linearGradient id="appTile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs>
+<g transform="translate(0 0) scale(1)">
+<rect x="100" y="100" width="824" height="824" rx="185" fill="url(#appTile)"/>
+<rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="6"/>
+<g transform="translate(281 281) scale(19.25)" opacity="1">
+<mask id="a6cut35"><rect width="24" height="24" fill="#fff"/><path d="M7.3 11.6l3 3-3 3M12.4 17.6h4.4" fill="none" stroke="#000" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></mask>
+<path d="M2.8 10.8 12 3l9.2 7.8V19.5a2 2 0 0 1-2 2H4.8a2 2 0 0 1-2-2z" fill="#fff" mask="url(#a6cut35)"/></g></g>
+</svg>

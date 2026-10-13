@@ -1,0 +1,11 @@
+.*
+!.gitignore
+!.github
+!.vscode
+!.claude
+!.scripts
+.claude/settings.local.json
+.swiftpm/
+build/
+node_modules
+dist

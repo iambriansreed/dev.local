@@ -1,0 +1,19 @@
+{
+    "_comment": "Configuration for commit-and-tag-version, passed with --config by .scripts/release.ts. It reads the current version from packageFiles, works out the bump from the Conventional Commits since the last tag, writes it to every bumpFiles entry, updates CHANGELOG.md, commits 'chore(release): x.y.z' and tags v<x.y.z>. app/Resources/Info.plist is the one place the version is set; the rest are generated copies (this repo's npm package, its lockfile, and the copy the website imports), and .scripts/version.ts --check verifies they agree before CI releases or deploys.",
+    "_updater": "Info.plist is not a format the tool knows, so these entries name a module that teaches it one key. The tool require()s that path and calls readVersion/writeVersion on it, which is why the plist logic lives in .scripts/plist-version.ts: .scripts/version.ts imports the same module, so a release and a bump by hand cannot drift apart.",
+    "packageFiles": [
+        {
+            "filename": "app/Resources/Info.plist",
+            "updater": ".scripts/plist-version.ts"
+        }
+    ],
+    "bumpFiles": [
+        {
+            "filename": "app/Resources/Info.plist",
+            "updater": ".scripts/plist-version.ts"
+        },
+        { "filename": "package.json", "type": "json" },
+        { "filename": "package-lock.json", "type": "json" },
+        { "filename": "web/version.json", "type": "json" }
+    ]
+}

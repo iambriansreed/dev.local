@@ -1,0 +1,21 @@
+{
+    // The server, compiled by tsc alone into dist/ with the same shape as src/. ES modules
+    // throughout (package.json says so).
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
+        // Source imports name the real file (`./nginx.ts`), which tsx runs as is and tsc
+        // rewrites to `.js` on emit.
+        "rewriteRelativeImportExtensions": true,
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "types": ["node"],
+        "lib": ["ES2022"],
+        "rootDir": "src",
+        "outDir": "dist"
+    },
+    "include": ["src/**/*.ts"]
+}

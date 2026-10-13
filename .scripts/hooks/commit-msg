@@ -1,0 +1,22 @@
+#!/bin/sh
+# Git insists on this exact filename, with no extension, so this is a small shim that
+# hands the commit message to the real hook next to it. Keeping the logic in a .ts file
+# means `npm run typecheck` checks it like every other script here (Node runs it as is).
+#
+# Enable once per clone:  git config core.hooksPath .scripts/hooks
+
+# A git client started from the Dock (VS Code, say) gets the system's bare PATH, not
+# the shell profile's, so node from Homebrew or nvm isn't on it. Look there after PATH;
+# for nvm, the newest installed version.
+if ! command -v node >/dev/null 2>&1; then
+    for dir in "${NVM_DIR:-$HOME/.nvm}"/versions/node/*/bin; do
+        [ -x "$dir/node" ] && nvm_bin=$dir
+    done
+    PATH="$PATH:/opt/homebrew/bin:/usr/local/bin${nvm_bin:+:$nvm_bin}"
+fi
+if ! command -v node >/dev/null 2>&1; then
+    # Not worth blocking a commit over: say so and let it through
+    echo "commit-msg: node not found, so the Conventional Commit check was skipped" >&2
+    exit 0
+fi
+exec node "$(dirname "$0")/commit-msg.ts" "$@"

@@ -1,0 +1,28 @@
+{
+    "skrapa": {
+        "output": "dist",
+        "assets": "assets",
+        "port": 4180,
+        "host": "localhost",
+        "origin": "https://marketing.dev.localhost",
+        "projectRoot": "."
+    },
+    "compilerOptions": {
+        "composite": true,
+        "target": "ES2020",
+        "module": "commonjs",
+        "jsx": "react",
+        "jsxFactory": "jsx",
+        "jsxFragmentFactory": "Fragment",
+        "strict": true,
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        "rewriteRelativeImportExtensions": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "types": ["node"],
+        "lib": ["DOM", "DOM.Iterable", "ES2020"]
+    },
+    "include": ["**/*.ts", "**/*.tsx", "version.json", "skrapa.d.ts"],
+    "exclude": ["node_modules", "dist"]
+}
