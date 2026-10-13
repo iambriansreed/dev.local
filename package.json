@@ -1,6 +1,6 @@
 {
     "name": "dev.local",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "private": true,
     "license": "Apache-2.0",
     "description": "Local nginx proxy management for dev servers: a menu bar app, the dashboard server behind it, and the website that installs it.",
