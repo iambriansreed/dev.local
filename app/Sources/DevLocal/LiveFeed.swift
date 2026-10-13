@@ -1,16 +1,20 @@
 import Foundation
 import DevLocalCore
 
-/// The /ws socket: the status push, decoded, and a watched process's output. Reconnects
-/// with a backoff capped at ten seconds, so a server that restarts is picked up without the
-/// app being relaunched; a watch survives the reconnect (it is re-sent on open).
+/// The /ws push, over the server's Unix socket (UnixWebSocket): the status, decoded, and a
+/// watched process's output. Reconnects with a backoff capped at ten seconds, so a server
+/// that restarts is picked up without the app being relaunched; a watch survives the
+/// reconnect (it is re-sent on open).
 @MainActor
 final class LiveFeed {
     var onStatus: ((LiveStatus) -> Void)?
     var onLog: ((LogFrame) -> Void)?
     var onConnectionChange: ((Bool) -> Void)?
 
-    private var task: URLSessionWebSocketTask?
+    private var connection: UnixWebSocket?
+    /// Bumped on every connect and stop, so a connection that ends after it was replaced
+    /// can tell it is no longer the current one.
+    private var generation = 0
     private var backoff: TimeInterval = 1
     private var wanted = false
     private var watching: String?
@@ -22,8 +26,9 @@ final class LiveFeed {
 
     func stop() {
         wanted = false
-        task?.cancel(with: .normalClosure, reason: nil)
-        task = nil
+        generation += 1
+        connection?.close()
+        connection = nil
     }
 
     /// Ask for a process's output (the whole buffer first, marked `reset`, then every chunk as
@@ -34,43 +39,50 @@ final class LiveFeed {
     }
 
     private func sendWatch() {
-        guard let task, let data = try? JSONEncoder().encode(["watch": watching]),
+        guard let connection, let data = try? JSONEncoder().encode(["watch": watching]),
               let text = String(data: data, encoding: .utf8) else { return }
-        task.send(.string(text)) { _ in }
+        connection.send(text)
     }
 
     private func connect() {
-        guard wanted, let url = URL(string: "ws://127.0.0.1:\(ServerHost.port)/ws") else { return }
-        let socket = URLSession.shared.webSocketTask(with: url)
-        task = socket
-        socket.resume()
-        if watching != nil { sendWatch() }
-        receive(on: socket)
-    }
-
-    private func receive(on socket: URLSessionWebSocketTask) {
-        socket.receive { [weak self] result in
-            Task { @MainActor in
-                guard let self, self.task === socket else { return }
-                switch result {
-                case let .success(message):
-                    self.backoff = 1
-                    self.onConnectionChange?(true)
-                    if case let .string(text) = message, let data = text.data(using: .utf8) {
-                        if let frame = try? JSONDecoder().decode(LogFrame.self, from: data), frame.type == "log" {
-                            self.onLog?(frame)
-                        } else if let status = try? JSONDecoder().decode(LiveStatus.self, from: data) {
-                            self.onStatus?(status)
-                        }
-                    }
-                    self.receive(on: socket)
-                case .failure:
-                    self.onConnectionChange?(false)
-                    self.task = nil
-                    self.retry()
+        guard wanted else { return }
+        generation += 1
+        let current = generation
+        Task {
+            do {
+                let opened = try await UnixWebSocket.open(
+                    socket: ServerHost.socketPath,
+                    onText: { [weak self] text in self?.received(text, generation: current) },
+                    onClose: { [weak self] in self?.ended(generation: current) }
+                )
+                guard current == generation else {
+                    opened.close()
+                    return
                 }
+                connection = opened
+                if watching != nil { sendWatch() }
+            } catch {
+                ended(generation: current)
             }
         }
+    }
+
+    private func received(_ text: String, generation current: Int) {
+        guard current == generation, let data = text.data(using: .utf8) else { return }
+        backoff = 1
+        onConnectionChange?(true)
+        if let frame = try? JSONDecoder().decode(LogFrame.self, from: data), frame.type == "log" {
+            onLog?(frame)
+        } else if let status = try? JSONDecoder().decode(LiveStatus.self, from: data) {
+            onStatus?(status)
+        }
+    }
+
+    private func ended(generation current: Int) {
+        guard current == generation else { return }
+        connection = nil
+        onConnectionChange?(false)
+        retry()
     }
 
     private func retry() {

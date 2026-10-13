@@ -24,6 +24,8 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026 Brian Reed. Licensed under the Apache License 2.0.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>dev.localhost brings the Terminal or iTerm2 tab that runs an app to the front, so you can read its log.</string>
 </dict>

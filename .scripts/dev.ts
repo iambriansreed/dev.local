@@ -195,15 +195,17 @@ try {
     console.error(`could not place marketing.json first: ${error instanceof Error ? error.message : error}`);
 }
 
-// A server already on the port would be attached to instead of started, and it would not be this
-// checkout's code.
+// A server already on the API socket would be attached to instead of started, and it would not be
+// this checkout's code. (A file there with nothing listening is a crash's leftover; the server
+// clears that itself.)
+const SOCKET = path.join(os.homedir(), '.dev.localhost', 'server.sock');
 const taken = await new Promise<boolean>((resolve) => {
-    const socket = net.connect({ port: 7878, host: '127.0.0.1' });
+    const socket = net.connect(SOCKET);
     socket.once('connect', () => (socket.destroy(), resolve(true)));
     socket.once('error', () => resolve(false));
 });
 if (taken) {
-    console.error('port 7878 is already in use (an old dev loop or an installed dev.localhost?). Stop it first.');
+    console.error(`a dev.localhost server is already listening on ${SOCKET} (an old dev loop or the installed app?). Stop it first.`);
     process.exit(1);
 }
 

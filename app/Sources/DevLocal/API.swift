@@ -1,14 +1,14 @@
 import Foundation
 import DevLocalCore
 
-/// The server's HTTP API on 127.0.0.1. Loopback only, like the server. Every action route
-/// answers an `ActionResult` whatever its status: a 400 carries the reason in `error`, so the
-/// body is decoded for every status and only a failure to reach the server throws.
+/// The server's HTTP API, on its Unix socket (UnixSocket.swift). Every action route answers an
+/// `ActionResult` whatever its status: a 400 carries the reason in `error`, so the body is
+/// decoded for every status and only a failure to reach the server throws.
 struct API {
-    let base: URL
+    let socket: String
 
-    init(port: Int = ServerHost.port) {
-        base = URL(string: "http://127.0.0.1:\(port)")!
+    init(socket: String = ServerHost.socketPath) {
+        self.socket = socket
     }
 
     func state() async throws -> AppState {
@@ -100,22 +100,15 @@ struct API {
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(from: base.appendingPathComponent(path))
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
-        return try JSONDecoder().decode(T.self, from: data)
+        let response = try await UnixHTTP.request(socket: socket, method: "GET", path: path)
+        guard (200..<300).contains(response.status) else { throw URLError(.badServerResponse) }
+        return try JSONDecoder().decode(T.self, from: response.body)
     }
 
     @discardableResult
     private func send(_ method: String, _ path: String, body: (some Encodable)? = Optional<[String: String]>.none) async throws -> ActionResult {
-        var request = URLRequest(url: base.appendingPathComponent(path))
-        request.httpMethod = method
-        if let body {
-            request.setValue("application/json", forHTTPHeaderField: "content-type")
-            request.httpBody = try JSONEncoder().encode(body)
-        }
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(ActionResult.self, from: data)
+        let encoded = try body.map { try JSONEncoder().encode($0) }
+        let response = try await UnixHTTP.request(socket: socket, method: method, path: path, body: encoded)
+        return try JSONDecoder().decode(ActionResult.self, from: response.body)
     }
 }

@@ -3,10 +3,23 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>dev.localhost | Your dev servers at https://*.localhost, from the menu bar</title>
+        <title>dev.localhost | Give localhost a real name</title>
+        <!-- Google tag (gtag.js), the same property as iambrian.com -->
+        <script
+            async
+            src="https://www.googletagmanager.com/gtag/js?id=G-N4JE182M9S"
+        ></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+                dataLayer.push(arguments);
+            }
+            gtag('js', new Date());
+            gtag('config', 'G-N4JE182M9S');
+        </script>
         <meta
             name="description"
-            content="dev.localhost is a native macOS menu bar app that serves your local dev servers at tidy https://name.localhost domains, starts and stops them, and opens their logs. One command installs it."
+            content="A tiny native Mac app that turns localhost:PORT into a real https domain, at a .localhost name or one of your own, and starts, stops and opens the log of every dev server from the menu bar. One command installs it."
         />
         <link rel="icon" href="favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href="/style.css" />

@@ -29,7 +29,9 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/DevLocal"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-cp Resources/AppIcon.icns Resources/StatusIcon*.png Resources/Glyph-*.png "$APP/Contents/Resources/"
+# Heart.svg is the About panel's credit heart (About.swift)
+cp Resources/AppIcon.icns Resources/StatusIcon*.png Resources/Glyph-*.png Resources/Heart.svg \
+    "$APP/Contents/Resources/"
 
 if [ "$CONFIG" = debug ]; then
     echo "built $APP"

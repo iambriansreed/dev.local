@@ -41,19 +41,20 @@ export function Page(): Skrapa.Page {
             </header>
 
             <section class="hero">
-                <h1>Your dev servers, in your menu bar</h1>
-                <p class="tagline">
-                    dev.localhost is a small, native Mac app. Every local app gets a tidy{' '}
-                    <code>https://name.localhost</code> address, and starting, stopping and reading its
-                    log is one click away.
+                <h1>Give localhost a real name</h1>
+                <p class="hero-swap">
+                    <code class="from">localhost:8675</code>
+                    <span class="arrow" aria-hidden="true">
+                        →
+                    </span>
+                    <span class="visually-hidden">becomes</span>
+                    <code class="to">https://local.jenny.com</code>
                 </p>
-                <img
-                    class="hero-shot"
-                    src="01-menu-running.svg"
-                    alt="The dev.localhost menu: nginx running, Storefront and Northwind running with their hosts, and Storefront's submenu with Edit, Open, Clone, Log and Stop"
-                    width="580"
-                    height="280"
-                />
+                <p class="tagline">
+                    A tiny native Mac app that puts every dev server behind real https, at a{' '}
+                    <code>.localhost</code> name or a domain of your own. Start it, stop it and read its
+                    log right from the menu bar. nginx runs as you, so none of that asks for a password.
+                </p>
             </section>
 
             <section class="install" id="install">
@@ -122,6 +123,15 @@ export function Page(): Skrapa.Page {
                             opens its folder in VS Code, clones it as the start of a new app, shows its log,
                             and, last, stops it.
                         </p>
+                        <img
+                            class="screenshot"
+                            src="01-menu-running.svg"
+                            alt="The dev.localhost menu: nginx running, Storefront and Northwind running with their hosts, and Storefront's submenu with Edit, Open, Clone, Log and Stop"
+                            width="580"
+                            height="280"
+                            loading="lazy"
+                            decoding="async"
+                        />
                         <p>
                             <strong>Start App</strong> lists everything that isn't running. Pick one and its
                             dev server starts in its folder, with its own command (<code>npm run dev</code>{' '}
@@ -199,10 +209,10 @@ export function Page(): Skrapa.Page {
                     </div>
                     <img
                         class="screenshot"
-                        src="06-settings-new-app.svg"
-                        alt="The Settings window: the new app form filled in from Clone, and the apps with their titles, addresses, ports and folders"
-                        width="1000"
-                        height="690"
+                        src="06-settings.png"
+                        alt="The Settings window: the new app form filled in from Clone, nginx, and the apps with their ports and addresses, running ones first and one marked Fix hosts entry"
+                        width="640"
+                        height="678"
                         loading="lazy"
                         decoding="async"
                     />

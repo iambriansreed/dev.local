@@ -31,6 +31,8 @@ public enum MenuAction: Equatable, Sendable {
     case clone(name: String)
     case newApp
     case settings
+    /// The standard About panel: name, version, copyright and Credits.rtf.
+    case about
     case quit
 }
 
@@ -183,6 +185,7 @@ public func buildMenu(_ input: MenuInput) -> [MenuEntry] {
     entries.append(.item(MenuItem(title: "New App…", glyph: .plus, action: .newApp)))
     entries.append(.separator)
     entries.append(.item(MenuItem(title: "Settings…", key: ",", action: .settings)))
+    entries.append(.item(MenuItem(title: "About dev.localhost", action: .about)))
     entries.append(.item(MenuItem(title: "Quit dev.localhost", key: "q", action: .quit)))
     if input.devMode {
         entries.append(.item(MenuItem(id: "dev-mode", title: "Dev Mode", enabled: false)))

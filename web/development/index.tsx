@@ -97,7 +97,9 @@ export function Page(): Skrapa.Page {
                     <h2>How it works</h2>
                     <p>
                         The menu bar app starts the Node server as a child process, or attaches to one a
-                        terminal already started, and talks to it over HTTP and a WebSocket. The server
+                        terminal already started, and talks to it over HTTP and a WebSocket on a Unix
+                        socket, <code>~/.dev.localhost/server.sock</code>, which only you can open: no
+                        port, so no web page can reach the API. The server
                         writes nginx's config, runs nginx as you, starts dev servers and keeps their output
                         in <code>~/.dev.localhost/logs/apps/</code>, which is what Log opens. Settings is a
                         native window on the same API. Only writes to <code>/etc/hosts</code> need root. The

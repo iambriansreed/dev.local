@@ -43,6 +43,7 @@ app/scripts/bundle.sh       # build/dev.localhost.app (debug, or "release" for a
 app/scripts/install-local.sh # build and install to /Applications, for trying a real build
 app/scripts/make-dmg.sh     # build/dev.localhost-<version>.dmg
 app/scripts/make-icons.sh   # regenerate the icons from app/Resources/AppIcon.svg and StatusIcon.svg
+app/scripts/screenshot.sh   # the website's Settings screenshot, taken from the app in demo mode
 ```
 
 The menu bar app runs the server itself, `npm run dev` included. With `npm run dev:server` or
@@ -67,3 +68,12 @@ commit check once per clone with `git config core.hooksPath .scripts/hooks`.
 Everything dev.localhost keeps is under `~/.dev.localhost`: the proxy list (`proxies.json`), the
 generated nginx config, certificates and logs. Apps' output is in `logs/apps/`, and the
 `.command` files in that folder are what Terminal runs for Log.
+
+The app talks to its server over `~/.dev.localhost/server.sock`, a Unix socket only you can open,
+rather than a port, so no web page can reach the API. To poke at it by hand:
+`curl --unix-socket ~/.dev.localhost/server.sock http://localhost/api/state`.
+
+## License
+
+[Apache-2.0](LICENSE). Copyright 2026 Brian Reed. Redistributions and forks must keep
+the [NOTICE](NOTICE) file.

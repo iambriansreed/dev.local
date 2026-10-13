@@ -2,7 +2,7 @@
 # what runs in a job that can push to main), so updates come from here instead: a
 # weekly PR that bumps the SHA and its "# vX.Y.Z" comment together. npm likewise, for
 # the few devDependencies package-lock.json pins. The commit prefixes keep these PRs
-# Conventional Commits that cut no release (see CLAUDE.md, "Release pipeline").
+# Conventional Commits that cut no release.
 version: 2
 updates:
     - package-ecosystem: github-actions

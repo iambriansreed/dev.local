@@ -3,7 +3,7 @@ import DevLocalCore
 
 /// The Node server the app runs, or the one a terminal already started.
 ///
-/// Probe first: a server that answers on the port is attached to and never stopped on
+/// Probe first: a server that answers on the socket is attached to and never stopped on
 /// Quit. Otherwise the app spawns its own, with the login shell's PATH (a Finder-launched
 /// app gets launchd's PATH, which has no node, mkcert or code). The server never runs sudo:
 /// the one root write, /etc/hosts, goes through a Terminal script the user runs.
@@ -16,8 +16,10 @@ final class ServerHost {
         case crashed
     }
 
-    /// Where the server answers: 7878, or DEV_LOCAL_PORT (the demo's fake server).
-    nonisolated static let port = Int(ProcessInfo.processInfo.environment["DEV_LOCAL_PORT"] ?? "") ?? 7878
+    /// The Unix socket the server answers on: ~/.dev.localhost/server.sock, or DEV_LOCAL_SOCKET
+    /// (the demo's fake server). A file only the user can open, not a port: see UnixSocket.
+    nonisolated static let socketPath = ProcessInfo.processInfo.environment["DEV_LOCAL_SOCKET"]
+        ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dev.localhost/server.sock").path
 
     /// Set by `npm run dev` (app/scripts/dev-app.sh), never by a plain install. The app still
     /// starts its own server, as an installed one does; this only marks the menu as a dev build.
@@ -56,7 +58,7 @@ final class ServerHost {
             return
         }
         Task {
-            if await Self.answers(port: Self.port) {
+            if await Self.answers() {
                 set(.running(attached: true))
                 return
             }
@@ -89,6 +91,7 @@ final class ServerHost {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = loginPath
         env["DEV_LOCALHOST_ROOT"] = root.path
+        env["DEV_LOCALHOST_SOCKET"] = Self.socketPath
         child.environment = env
 
         let log = openLog()
@@ -109,7 +112,7 @@ final class ServerHost {
         // nginx's apply and reached `listen()`. Reporting .running before that raced the app's
         // first /api/state fetch, which then had nothing to retry it: the menu stayed stuck on
         // whatever the empty state showed (plainly, "every app is running") no matter how long
-        // the server had actually been up. So this waits for the port itself.
+        // the server had actually been up. So this waits for the socket to answer.
         waitToComeUp(child)
     }
 
@@ -119,7 +122,7 @@ final class ServerHost {
         Task {
             let deadline = Date().addingTimeInterval(120)
             while process === child, Date() < deadline {
-                if await Self.answers(port: Self.port) {
+                if await Self.answers() {
                     if process === child { set(.running(attached: false)) }
                     return
                 }
@@ -129,7 +132,7 @@ final class ServerHost {
         }
     }
 
-    /// Exit status 2 is the server saying the port is taken: someone else started one
+    /// Exit status 2 is the server saying the socket is taken: someone else started one
     /// between our probe and our spawn, so attach to it.
     private func exited(status: Int32) {
         process = nil
@@ -156,12 +159,9 @@ final class ServerHost {
         return handle
     }
 
-    /// Whether something answers the API on the port within 300 ms.
-    static func answers(port: Int) async -> Bool {
-        guard let url = URL(string: "http://127.0.0.1:\(port)/api/state") else { return false }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 0.3
-        return (try? await URLSession.shared.data(for: request))
-            .map { ($0.1 as? HTTPURLResponse)?.statusCode == 200 } ?? false
+    /// Whether something answers the API on the socket within half a second.
+    static func answers() async -> Bool {
+        let response = try? await UnixHTTP.request(socket: socketPath, method: "GET", path: "/api/state", timeout: 0.5)
+        return response?.status == 200
     }
 }

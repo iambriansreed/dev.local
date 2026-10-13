@@ -3,12 +3,15 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Duplex } from 'node:stream';
 import * as nginx from './nginx.ts';
 import * as procs from './procs.ts';
+import { claimSocket, listenOnSocket } from './socket.ts';
 
-const PORT = nginx.config.port;
-const HOST = '127.0.0.1'; // localhost only — never expose this to the network.
+// A Unix socket, never a port: nothing but the user's own processes can reach it.
+const SOCKET = nginx.config.socket;
 
 // An optional shell command to run alongside the server, started once nginx is up.
 const DEV_CMD = (process.argv[2] || '').trim();
@@ -204,7 +207,7 @@ const server = http.createServer((req, res) => {
 });
 
 // --- minimal WebSocket at /ws ----------------------------------------------
-// The menu bar app keeps a socket open (straight to 127.0.0.1, not through nginx) so
+// The menu bar app keeps a socket open (on the Unix socket, not through nginx) so
 // we can push "is each dev server running?" often, live — and, while a console
 // is open, that process's output as it arrives. No dependency; hand-rolled per
 // RFC 6455.
@@ -423,20 +426,25 @@ function runDevCmd(): void {
     });
 }
 
-// A second server on the same port (the menu bar app attaches to one a terminal already
-// started) is not a crash: say so in one line, and exit with a code the app can read.
-server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
-        console.log(`  Port ${PORT} is already in use. A dev.localhost server is probably running.`);
+// A second server (the menu bar app attaches to one a terminal already started) is not a
+// crash: say so in one line, and exit with a code the app can read.
+async function listen(): Promise<void> {
+    fs.mkdirSync(path.dirname(SOCKET), { recursive: true });
+    if ((await claimSocket(SOCKET)) === 'taken') {
+        console.log(`  ${SOCKET} is in use. A dev.localhost server is probably running.`);
         process.exit(2);
     }
-    console.log(`  Could not listen on ${HOST}:${PORT} — ${err.message}`);
-    process.exit(1);
-});
+    try {
+        await listenOnSocket(server, SOCKET);
+    } catch (err) {
+        console.log(`  Could not listen on ${SOCKET} — ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+    }
+    // Ours now, so ours to remove; a file left by a crash is cleared by the next claimSocket
+    process.on('exit', () => fs.rmSync(SOCKET, { force: true }));
 
-server.listen(PORT, HOST, () => {
     console.log('');
-    console.log(`  dev.localhost server on http://${HOST}:${PORT}`);
+    console.log(`  dev.localhost server on ${SOCKET}`);
 
     if (!nginx.nginxBin()) {
         console.log('  nginx is not installed — install it, then restart:');
@@ -465,4 +473,6 @@ server.listen(PORT, HOST, () => {
 
     nginx.watchHostsFile();
     runDevCmd();
-});
+}
+
+void listen();

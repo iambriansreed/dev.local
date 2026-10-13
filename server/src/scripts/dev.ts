@@ -1,16 +1,19 @@
 // `npm run dev:server` — tsc compiles and watches, the server runs from its output and is
 // restarted whenever that output changes.
 
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 
 // This file lives at src/scripts/, so the server folder is two levels up.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const BIN = path.resolve(ROOT, '..', 'node_modules', '.bin');
 const SERVER = path.join(ROOT, 'dist', 'server', 'index.js');
-const PORT = Number(process.env.DEV_LOCALHOST_PORT) || 7878;
+// The server's API socket, as nginx.ts works it out (it cannot be imported from here: this
+// runs before the first compile)
+const SOCKET = process.env.DEV_LOCALHOST_SOCKET || path.join(os.homedir(), '.dev.localhost', 'server.sock');
 const color = { cyan: '\x1b[36m', gray: '\x1b[90m', red: '\x1b[31m', reset: '\x1b[0m' };
 
 let tsc: ChildProcess | null = null;
@@ -25,12 +28,9 @@ async function main(): Promise<void> {
     process.on('SIGINT', () => void shutdown(0));
     process.on('SIGTERM', () => void shutdown(0));
 
-    // Something already on the port would make the server exit at once; refuse, and say
-    // what holds it.
+    // A server already on the socket would make this one exit at once; refuse, and say so.
     if (await canConnect()) {
-        const holder = spawnSync('lsof', ['-nP', `-iTCP:${PORT}`, '-sTCP:LISTEN'], { encoding: 'utf8' }).stdout;
-        log(`port ${PORT} is already in use, so the server cannot start. Stop what holds it first:`, color.red);
-        for (const line of holder.split('\n').slice(1, 3)) if (line.trim()) log(`  ${line.trim()}`, color.red);
+        log(`a dev.localhost server is already listening on ${SOCKET}. Quit the app (or stop that server) first.`, color.red);
         return void shutdown(1);
     }
 
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
 
 function canConnect(): Promise<boolean> {
     return new Promise((resolve) => {
-        const socket = net.connect({ port: PORT, host: '127.0.0.1' });
+        const socket = net.connect(SOCKET);
         const done = (ok: boolean) => {
             socket.destroy();
             resolve(ok);

@@ -33,21 +33,21 @@ final class MenuLogicTests: XCTestCase {
         entries.map { if case let .item(item) = $0 { item.title } else { "-" } }
     }
 
-    // The whole menu, in the mock's order: nginx, running apps, Start App and New App, Settings and Quit.
+    // The whole menu, in the mock's order: nginx, running apps, Start App and New App, Settings, About and Quit.
     func testOrderMatchesTheMock() {
         let menu = buildMenu(MenuInput(state: state([
             proxy("storefront", port: 3000, title: "Storefront", devRunning: true),
             proxy("docs", port: 5173, title: "Docs", devRunning: false),
         ])))
         XCTAssertEqual(outline(menu), [
-            "nginx running", "-", "Storefront", "-", "Start App", "New App…", "-", "Settings…", "Quit dev.localhost",
+            "nginx running", "-", "Storefront", "-", "Start App", "New App…", "-", "Settings…", "About dev.localhost", "Quit dev.localhost",
         ])
     }
 
     // Without running apps there is no empty block and no doubled separator.
     func testNoRunningAppsLeavesNoEmptyBlock() {
         let menu = buildMenu(MenuInput(state: state([proxy("demo", port: 8080, devRunning: false)])))
-        XCTAssertEqual(outline(menu), ["nginx running", "-", "Start App", "New App…", "-", "Settings…", "Quit dev.localhost"])
+        XCTAssertEqual(outline(menu), ["nginx running", "-", "Start App", "New App…", "-", "Settings…", "About dev.localhost", "Quit dev.localhost"])
     }
 
     func testIconsDotsAndKeysMatchTheMock() {
@@ -58,6 +58,8 @@ final class MenuLogicTests: XCTestCase {
         XCTAssertEqual(find(menu, titled: "New App…")?.glyph, .plus)
         XCTAssertNil(find(menu, titled: "Settings…")?.glyph, "Settings has no icon")
         XCTAssertEqual(find(menu, titled: "Settings…")?.key, ",")
+        XCTAssertEqual(find(menu, titled: "About dev.localhost")?.action, .about)
+        XCTAssertNil(find(menu, titled: "About dev.localhost")?.key, "About has no shortcut")
         XCTAssertNil(find(menu, titled: "Quit dev.localhost")?.glyph, "Quit has no icon")
         XCTAssertEqual(find(menu, titled: "Quit dev.localhost")?.key, "q")
     }
@@ -200,7 +202,7 @@ final class MenuLogicTests: XCTestCase {
     func testStartingAppMovesToTheMainMenuLoading() {
         let menu = buildMenu(MenuInput(state: state([proxy("down", port: 3001, title: "Down", devRunning: false)]), starting: ["down"]))
         XCTAssertEqual(outline(menu), [
-            "nginx running", "-", "Down", "-", "Start App", "New App…", "-", "Settings…", "Quit dev.localhost",
+            "nginx running", "-", "Down", "-", "Start App", "New App…", "-", "Settings…", "About dev.localhost", "Quit dev.localhost",
         ])
         let row = find(menu, titled: "Down")!
         XCTAssertEqual(row.dot, .loading)

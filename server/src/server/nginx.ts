@@ -18,10 +18,16 @@ export type { CertMethod, Proxy, ProxyInput, ProxyState, State } from '../shared
 
 const HOME = os.homedir();
 
-/** Where this server keeps its files, and the port its API and live socket listen on. */
+const BASE = path.join(HOME, '.dev.localhost');
+
+/**
+ * Where this server keeps its files, and the Unix socket its API and live push listen on
+ * (see socket.ts for why it is not a port). DEV_LOCALHOST_SOCKET moves the socket, for a
+ * second server beside the installed one.
+ */
 export const config = {
-    base: path.join(HOME, '.dev.localhost'),
-    port: Number(process.env.DEV_LOCALHOST_PORT) || 7878,
+    base: BASE,
+    socket: process.env.DEV_LOCALHOST_SOCKET || path.join(BASE, 'server.sock'),
 };
 
 /**
@@ -1084,9 +1090,6 @@ function validatePort(port: unknown, existing: Proxy[], excluding?: string): Val
     }
     if (value === 80 || value === 443) {
         return { error: 'Port 80 and 443 are used by nginx itself — pick your app’s port.' };
-    }
-    if (value === config.port) {
-        return { error: `Port ${value} is used by dev.localhost itself.` };
     }
     // One port, one app. Two proxies pointing at the same one is a mistake
     // nothing downstream can show: nginx would send both domains to whichever

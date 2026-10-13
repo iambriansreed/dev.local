@@ -35,8 +35,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         server?.start()
         feed.start()
-        Task { await model.refresh() }
+        Task {
+            await model.refresh()
+            if demo { openForScreenshot() }
+        }
         stopServerOnSignal()
+    }
+
+    /// Demo mode only: DEV_LOCAL_DEMO_OPEN opens a window at launch, so app/scripts/screenshot.sh
+    /// can capture it without clicking through the menu. `settings`, `new`, or `clone:<name>`.
+    private func openForScreenshot() {
+        guard let open = ProcessInfo.processInfo.environment["DEV_LOCAL_DEMO_OPEN"] else { return }
+        if open == "settings" {
+            perform(.settings)
+        } else if open == "new" {
+            perform(.newApp)
+        } else if open.hasPrefix("clone:") {
+            perform(.clone(name: String(open.dropFirst("clone:".count))))
+        }
     }
 
     /// SIGTERM and SIGINT (what `npm run dev` sends when it restarts or stops the app) end the
@@ -170,6 +186,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings.show()
         case .settings:
             settings.show()
+        case .about:
+            About.show()
         case .quit:
             Task {
                 await server?.stop()
@@ -178,14 +196,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func showAbout() {
+        About.show()
+    }
+
     private var logsDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dev.localhost/logs")
     }
 
     /// Edit menu, so Cmd-C and Cmd-V work in the Settings window's fields (the app has no
-    /// main menu of its own).
+    /// main menu of its own). The app menu goes first, since the first item always takes that
+    /// slot, and carries About as Menu OTP's does.
     private func installEditMenu() {
         let main = NSMenu()
+        let app = NSMenu(title: "dev.localhost")
+        let about = NSMenuItem(title: "About dev.localhost", action: #selector(showAbout), keyEquivalent: "")
+        about.target = self
+        app.addItem(about)
+        app.addItem(.separator())
+        app.addItem(NSMenuItem(title: "Quit dev.localhost", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let appItem = NSMenuItem()
+        appItem.submenu = app
+        main.addItem(appItem)
         let edit = NSMenu(title: "Edit")
         for (title, key, selector) in [
             ("Cut", "x", #selector(NSText.cut(_:))),

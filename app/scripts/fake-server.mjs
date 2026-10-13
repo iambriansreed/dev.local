@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-// A stand-in for the dev.localhost server, for demo mode: a canned /api and a /ws push, with no
+// A stand-in for the dev.localhost server, for demo mode: a canned /api and a /ws push on a Unix
+// socket, as the real one serves them, with no
 // nginx, no sudo and no dev servers. The apps are the samples in .scripts/dev.proxies.json.
 // Start, Stop, the nginx controls and the proxy edits change the canned state, so the menu and
 // the Settings window respond the way they would for real. Node built-ins only.
-// Usage: fake-server.mjs <port>
+// Usage: fake-server.mjs <socket path>
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const port = Number(process.argv[2] || 7979);
+const socketPath = process.argv[2];
+if (!socketPath) { console.error('usage: fake-server.mjs <socket path>'); process.exit(2); }
 let rev = 1;
 
 const app = (name, port, host, title, extra = {}) => ({
@@ -31,6 +33,9 @@ const state = {
     cert: { exists: true, method: 'mkcert', version: '1.4.4', mkcertAvailable: true, hosts: ['localhost'], trustCmd: null },
     baseDir: '/Users/demo/.dev.localhost',
 };
+// One custom domain with no /etc/hosts line yet, so its row shows Fix hosts entry.
+const UNRESOLVED = 'api.northwind.test';
+Object.assign(state.proxies.find((p) => p.name === UNRESOLVED) ?? {}, { hostsEntry: false, hostsManaged: false, needsHosts: true });
 // Storefront was started by the server (Log, and output to show); the others were started by hand.
 const ours = new Map([['storefront', { startedAt: Date.now() - 60_000, log: '\x1b[2m~/Projects/storefront $\x1b[0m \x1b[1mnpm run dev\x1b[0m\n\n> storefront@2.4.0 dev\n> vite\n\n  \x1b[32mVITE v7.1.3\x1b[0m  ready in \x1b[1m412\x1b[0m ms\n\n  \x1b[32m➜\x1b[0m  Local:   http://localhost:3000/\n' }]]);
 
@@ -152,4 +157,7 @@ server.on('upgrade', (req, socket) => {
     socket.on('close', () => clearInterval(timer));
 });
 
-server.listen(port, '127.0.0.1', () => console.log(`demo server on http://127.0.0.1:${port}`));
+fs.rmSync(socketPath, { force: true });
+server.listen(socketPath, () => console.log(`demo server on ${socketPath}`));
+process.on('exit', () => fs.rmSync(socketPath, { force: true }));
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => process.exit(0));
